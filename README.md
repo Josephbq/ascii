@@ -1,74 +1,92 @@
-# Conversor de Imagen a ASCII (Web)
+# Image to ASCII & Pixel Art
 
-Una aplicación web que convierte imágenes en arte ASCII, con la capacidad de previsualizar la imagen en blanco y negro antes de la conversión.
+Convert images into detailed **ASCII art** or high-resolution **pixel art** using a browser-based web app, or optional Python CLI tools.
 
-## Características
+## Web app (recommended)
 
-- 🖼️ **Carga de Imágenes**: Soporta formatos comunes (PNG, JPG, JPEG, BMP, GIF)
-- ⚡ **Procesamiento en Tiempo Real**: Conversión instantánea a blanco y negro
-- 🎨 **Ajustes Personalizables**:
-  - Control de contraste
-  - Ajuste del ancho del arte ASCII
-- 📱 **Interfaz Responsiva**: Funciona en dispositivos móviles y de escritorio
-- 💾 **Descarga de Resultados**: Guarda el arte ASCII en formato texto
-- 🖥️ **Vista Previa**: Muestra la imagen original y la versión en blanco y negro
+Open [`index.html`](index.html) in any modern browser. No install, no server, and no uploads — processing runs entirely on your device.
 
-## Cómo Usar
+### ASCII Art tab
 
-1. **Cargar una Imagen**
-   - Haz clic en "Seleccionar Imagen"
-   - Elige una imagen de tu dispositivo
+- Multiple character sets: dense, blocks, braille, standard, and more
+- Optional black & white conversion before rendering
+- Color preview, dithering, gamma, contrast, and sharpening
+- Live preview with automatic font scaling
+- Copy to clipboard or download as `.txt`
 
-2. **Ajustar Configuraciones**
-   - **Ancho ASCII**: Controla el número de caracteres por línea (20-200)
-   - **Contraste**: Ajusta el contraste de la imagen (0.5-2.0)
+### Pixel Art tab
 
-3. **Generar Arte ASCII**
-   - Haz clic en "Convertir a ASCII"
-   - El resultado aparecerá en la sección inferior
+- High-detail grid up to **512 px** wide (height scales with aspect ratio)
+- Area-average downsampling for accurate per-pixel colors
+- **K-means** palette reduction (2–256 colors) with optional Floyd–Steinberg dithering
+- Contrast, saturation, and sharpness controls
+- Crisp preview with checkerboard background and pixelated scaling
+- Download preview PNG (zoomed) or native 1× resolution PNG
 
-4. **Descargar Resultado**
-   - Haz clic en "Descargar ASCII"
-   - El archivo se guardará como `ascii_art.txt`
+### Quick tips
 
-## Consejos para Mejores Resultados
+| Goal | Suggestion |
+|------|------------|
+| Recognizable ASCII | Use **Dense** or **Braille**, enable color preview, width 140–200 |
+| Retro pixel look | Grid 128–256, palette 8–32 colors, dithering on |
+| Maximum pixel detail | Grid width 384–512, palette 64–128 colors |
+| Sharp edges | Increase sharpness slightly; disable smoothing |
 
-### Selección de Imagen
-- Usa imágenes con buen contraste
-- Evita imágenes muy oscuras o muy claras
-- Las imágenes con formas definidas funcionan mejor
+## Python CLI tools
 
-### Ajustes Recomendados
-- **Para fotos**:
-  - Ancho ASCII: 100-150
-  - Contraste: 1.2-1.5
+Legacy command-line scripts are included for terminal workflows.
 
-- **Para logos o texto**:
-  - Ancho ASCII: 50-80
-  - Contraste: 1.5-2.0
+### Requirements
 
-- **Para arte simple**:
-  - Ancho ASCII: 30-50
-  - Contraste: 1.0-1.2
-
-## Requisitos Técnicos
-
-- Navegador web moderno (Chrome, Firefox, Safari, Edge)
-- JavaScript habilitado
-
-## Caracteres ASCII Utilizados
-
-El programa utiliza la siguiente secuencia de caracteres, ordenados por densidad:
-```
-@%#*+=-:. 
+```bash
+pip install -r requirements.txt
 ```
 
-## Limitaciones
+For the Flask pixel-art server (`pixel_art.py`):
 
-- El tamaño máximo de imagen recomendado es de 2000x2000 píxeles
-- El procesamiento se realiza en el navegador, por lo que imágenes muy grandes pueden causar lentitud
-- La calidad del resultado depende de la resolución y contraste de la imagen original
+```bash
+pip install -r requirements_pixel.txt
+```
 
-## Licencia
+### `arte.py` — detailed ASCII
 
-Este proyecto está bajo la Licencia MIT. Ver el archivo `LICENSE` para más detalles. 
+```bash
+python arte.py
+```
+
+Interactive file picker; keeps more detail with a wide character set.
+
+### `arte_simple.py` — simplified ASCII
+
+```bash
+python arte_simple.py
+```
+
+Lower resolution, fewer characters — more abstract output.
+
+### `pixel_art.py` — Flask pixel server
+
+```bash
+python pixel_art.py
+```
+
+Then open `http://localhost:5000`. The browser app in `index.html` offers more controls and does not require Python.
+
+## Supported formats
+
+PNG, JPG, JPEG, BMP, GIF, and other formats supported by the browser or Pillow.
+
+## Project structure
+
+| File | Description |
+|------|-------------|
+| `index.html` | Main web UI (ASCII + Pixel tabs) |
+| `script.js` | ASCII conversion engine |
+| `pixel.js` | Pixel art conversion engine |
+| `arte.py` | CLI ASCII (detailed) |
+| `arte_simple.py` | CLI ASCII (simple) |
+| `pixel_art.py` | Flask pixel-art server |
+
+## License
+
+[MIT](LICENSE) — Copyright (c) 2025–2026 Joseph Barral Quinteros
