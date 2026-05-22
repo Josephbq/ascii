@@ -1,8 +1,8 @@
-// Pixel art — high-detail client-side converter
-const pixelInput = document.getElementById('pixelImageInput');
-const pixelGridWidth = document.getElementById('pixelGridWidth');
+// Pixel art — client-side converter (native resolution by default)
+const pixelResolution = document.getElementById('pixelResolution');
 const pixelColors = document.getElementById('pixelColors');
 const pixelZoom = document.getElementById('pixelZoom');
+const pixelZoomAuto = document.getElementById('pixelZoomAuto');
 const pixelSharpen = document.getElementById('pixelSharpen');
 const pixelContrast = document.getElementById('pixelContrast');
 const pixelSaturation = document.getElementById('pixelSaturation');
@@ -12,17 +12,24 @@ const pixelCanvas = document.getElementById('pixelCanvas');
 const pixelOriginalPreview = document.getElementById('pixelOriginalPreview');
 const pixelDownloadBtn = document.getElementById('pixelDownloadBtn');
 const pixelGridInfo = document.getElementById('pixelGridInfo');
+const pixelDimensionsLabel = document.getElementById('pixelDimensionsLabel');
+const pixelNativeBadge = document.getElementById('pixelNativeBadge');
 
 const pixelCtx = pixelCanvas.getContext('2d', { willReadFrequently: true });
 
 let pixelSourceImage = null;
+let pixelNativeW = 0;
+let pixelNativeH = 0;
 let pixelGridW = 0;
 let pixelGridH = 0;
+let lastPixelImageData = null;
 
 const pixelControls = [
-    pixelGridWidth, pixelColors, pixelZoom, pixelSharpen,
+    pixelResolution, pixelColors, pixelZoom, pixelSharpen,
     pixelContrast, pixelSaturation, pixelDither, pixelSmooth,
 ];
+
+const MAX_CANVAS_PIXELS = 16_777_216; // ~4096² — typical browser limit
 
 function getPixelLuminance(r, g, b) {
     return 0.299 * r + 0.587 * g + 0.114 * b;
@@ -41,6 +48,41 @@ function applyPixelTone(r, g, b, contrast, saturation) {
     lg = gray + (lg - gray) * saturation;
     lb = gray + (lb - gray) * saturation;
     return [clamp255(lr), clamp255(lg), clamp255(lb)];
+}
+
+function getOutputDimensions() {
+    const pct = parseInt(pixelResolution?.value || 100, 10) / 100;
+    return {
+        w: Math.max(1, Math.round(pixelNativeW * pct)),
+        h: Math.max(1, Math.round(pixelNativeH * pct)),
+        pct: Math.round(pct * 100),
+    };
+}
+
+function processAtNativeResolution(srcImage, toneOpts, colorCount, sharpen, smooth, dither) {
+    const w = srcImage.width;
+    const h = srcImage.height;
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(srcImage, 0, 0);
+
+    let imageData = ctx.getImageData(0, 0, w, h);
+    const { contrast, saturation } = toneOpts;
+    const data = imageData.data;
+
+    for (let i = 0; i < data.length; i += 4) {
+        [data[i], data[i + 1], data[i + 2]] = applyPixelTone(
+            data[i], data[i + 1], data[i + 2], contrast, saturation
+        );
+    }
+
+    if (smooth) imageData = boxBlur(imageData, 1);
+    if (sharpen > 0) imageData = unsharpPixel(imageData, sharpen);
+    if (colorCount < 256) imageData = quantizeKMeans(imageData, colorCount, dither);
+
+    return imageData;
 }
 
 function downscaleAverage(srcImage, outW, outH, toneOpts) {
@@ -94,7 +136,7 @@ function colorDist(a, b) {
 function quantizeKMeans(imageData, k, dither) {
     const { width, height, data } = imageData;
     const pixels = [];
-    const step = Math.max(1, Math.floor((width * height) / 8000));
+    const step = Math.max(1, Math.floor((width * height) / 12000));
     for (let i = 0; i < data.length; i += 4 * step) {
         pixels.push([data[i], data[i + 1], data[i + 2]]);
     }
@@ -231,51 +273,6 @@ function unsharpPixel(imageData, amount) {
     return new ImageData(out, width, height);
 }
 
-function renderPixelArt() {
-    if (!pixelSourceImage) return;
-
-    const gridW = parseInt(pixelGridWidth.value, 10);
-    const aspect = pixelSourceImage.height / pixelSourceImage.width;
-    const gridH = Math.max(1, Math.round(gridW * aspect));
-    pixelGridW = gridW;
-    pixelGridH = gridH;
-
-    const contrast = parseFloat(pixelContrast.value);
-    const saturation = parseFloat(pixelSaturation.value);
-    const colorCount = parseInt(pixelColors.value, 10);
-    const zoom = parseInt(pixelZoom.value, 10);
-    const sharpen = parseFloat(pixelSharpen.value);
-
-    let imageData = downscaleAverage(pixelSourceImage, gridW, gridH, { contrast, saturation });
-
-    if (pixelSmooth.checked) {
-        imageData = boxBlur(imageData, 1);
-    }
-
-    if (sharpen > 0) {
-        imageData = unsharpPixel(imageData, sharpen);
-    }
-
-    if (colorCount < 256) {
-        imageData = quantizeKMeans(imageData, colorCount, pixelDither.checked);
-    }
-
-    const small = document.createElement('canvas');
-    small.width = gridW;
-    small.height = gridH;
-    small.getContext('2d').putImageData(imageData, 0, 0);
-
-    pixelCanvas.width = gridW * zoom;
-    pixelCanvas.height = gridH * zoom;
-    pixelCtx.imageSmoothingEnabled = false;
-    pixelCtx.clearRect(0, 0, pixelCanvas.width, pixelCanvas.height);
-    pixelCtx.drawImage(small, 0, 0, pixelCanvas.width, pixelCanvas.height);
-
-    if (pixelGridInfo) {
-        pixelGridInfo.textContent = `${gridW} × ${gridH} px · ${colorCount} colors · ${zoom}× zoom`;
-    }
-}
-
 function boxBlur(imageData, radius) {
     const { width, height, data } = imageData;
     const out = new Uint8ClampedArray(data);
@@ -305,6 +302,90 @@ function boxBlur(imageData, radius) {
     return new ImageData(out, width, height);
 }
 
+function computeFitZoom(gridW, gridH) {
+    const viewport = document.querySelector('.pixel-viewport');
+    if (!viewport) return 1;
+    const pad = 48;
+    const maxW = viewport.clientWidth - pad;
+    const maxH = Math.min(viewport.clientHeight || 480, window.innerHeight * 0.55) - pad;
+    if (gridW <= maxW && gridH <= maxH) return 1;
+    return Math.max(1, Math.floor(Math.min(maxW / gridW, maxH / gridH)));
+}
+
+function renderPixelArt() {
+    if (!pixelSourceImage) return;
+
+    const { w: gridW, h: gridH, pct } = getOutputDimensions();
+    pixelGridW = gridW;
+    pixelGridH = gridH;
+
+    const contrast = parseFloat(pixelContrast.value);
+    const saturation = parseFloat(pixelSaturation.value);
+    const colorCount = parseInt(pixelColors.value, 10);
+    let zoom = parseInt(pixelZoom.value, 10);
+    const sharpen = parseFloat(pixelSharpen.value);
+    const toneOpts = { contrast, saturation };
+
+    let imageData;
+
+    if (pct === 100) {
+        imageData = processAtNativeResolution(
+            pixelSourceImage,
+            toneOpts,
+            colorCount,
+            sharpen,
+            pixelSmooth?.checked,
+            pixelDither?.checked
+        );
+    } else {
+        imageData = downscaleAverage(pixelSourceImage, gridW, gridH, toneOpts);
+        if (pixelSmooth?.checked) imageData = boxBlur(imageData, 1);
+        if (sharpen > 0) imageData = unsharpPixel(imageData, sharpen);
+        if (colorCount < 256) {
+            imageData = quantizeKMeans(imageData, colorCount, pixelDither?.checked);
+        }
+    }
+
+    lastPixelImageData = imageData;
+
+    const small = document.createElement('canvas');
+    small.width = gridW;
+    small.height = gridH;
+    small.getContext('2d').putImageData(imageData, 0, 0);
+
+    if (pixelZoomAuto?.checked) {
+        const fit = computeFitZoom(gridW, gridH);
+        if (pixelZoom) {
+            pixelZoom.value = fit;
+            const label = document.getElementById('pixelZoomVal');
+            if (label) label.textContent = fit;
+        }
+        zoom = fit;
+    }
+
+    pixelCanvas.width = gridW * zoom;
+    pixelCanvas.height = gridH * zoom;
+    pixelCtx.imageSmoothingEnabled = false;
+    pixelCtx.clearRect(0, 0, pixelCanvas.width, pixelCanvas.height);
+    pixelCtx.drawImage(small, 0, 0, pixelCanvas.width, pixelCanvas.height);
+
+    updatePixelLabels(gridW, gridH, pct, colorCount, zoom);
+}
+
+function updatePixelLabels(gridW, gridH, pct, colorCount, zoom) {
+    if (pixelGridInfo) {
+        const nativeTag = pct === 100 ? ' · original resolution' : '';
+        pixelGridInfo.textContent = `${gridW} × ${gridH} px · ${colorCount} colors · ${zoom}× preview${nativeTag}`;
+    }
+    if (pixelDimensionsLabel) {
+        pixelDimensionsLabel.textContent =
+            `${gridW} × ${gridH} — ${pct}% of ${pixelNativeW} × ${pixelNativeH}`;
+    }
+    if (pixelNativeBadge) {
+        pixelNativeBadge.hidden = pct !== 100;
+    }
+}
+
 function showPixelOriginalPreview(img) {
     if (!pixelOriginalPreview) return;
     const max = 280;
@@ -318,14 +399,42 @@ function showPixelOriginalPreview(img) {
 
 function setPixelSourceImage(img) {
     pixelSourceImage = img;
+    pixelNativeW = img.width;
+    pixelNativeH = img.height;
+
+    const sizeEl = document.getElementById('pixelSourceSize');
+    if (sizeEl) sizeEl.textContent = `${img.width}×${img.height}`;
+
+    if (pixelResolution) {
+        pixelResolution.value = 100;
+        pixelResolution.disabled = false;
+    }
+
+    if (pixelZoom && pixelZoomAuto?.checked) {
+        pixelZoom.disabled = true;
+    }
+
+    const totalPixels = pixelNativeW * pixelNativeH;
+    const warnEl = document.getElementById('pixelLargeWarn');
+    if (warnEl) {
+        warnEl.hidden = totalPixels <= MAX_CANVAS_PIXELS;
+        if (!warnEl.hidden) {
+            warnEl.textContent =
+                `Large image (${pixelNativeW}×${pixelNativeH}). Processing may be slow; lower resolution % if needed.`;
+        }
+    }
+
     showPixelOriginalPreview(img);
+    const pixelDownloadNativeBtn = document.getElementById('pixelDownloadNativeBtn');
     if (pixelDownloadBtn) pixelDownloadBtn.disabled = false;
     if (pixelDownloadNativeBtn) pixelDownloadNativeBtn.disabled = false;
+
+    updatePixelRangeLabels();
     renderPixelArt();
 }
 
 function downloadPixelPng() {
-    if (!pixelSourceImage) return;
+    if (!lastPixelImageData) return;
     const link = document.createElement('a');
     link.download = 'pixel_art.png';
     link.href = pixelCanvas.toDataURL('image/png');
@@ -333,13 +442,11 @@ function downloadPixelPng() {
 }
 
 function downloadPixelNative() {
-    if (!pixelSourceImage) return;
+    if (!lastPixelImageData) return;
     const small = document.createElement('canvas');
     small.width = pixelGridW;
     small.height = pixelGridH;
-    const ctx = small.getContext('2d');
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(pixelCanvas, 0, 0, pixelGridW, pixelGridH);
+    small.getContext('2d').putImageData(lastPixelImageData, 0, 0);
     const link = document.createElement('a');
     link.download = `pixel_art_${pixelGridW}x${pixelGridH}.png`;
     link.href = small.toDataURL('image/png');
@@ -357,9 +464,17 @@ pixelControls.forEach((el) => {
     });
 });
 
+if (pixelZoomAuto) {
+    pixelZoomAuto.addEventListener('change', () => {
+        if (pixelZoom) pixelZoom.disabled = pixelZoomAuto.checked;
+        if (pixelSourceImage) renderPixelArt();
+    });
+}
+
 function updatePixelRangeLabels() {
+    const pct = pixelResolution?.value ?? 100;
     const map = {
-        pixelGridWidthVal: pixelGridWidth?.value,
+        pixelResolutionVal: pct,
         pixelColorsVal: pixelColors?.value,
         pixelZoomVal: pixelZoom?.value,
         pixelSharpenVal: pixelSharpen?.value,
@@ -370,18 +485,23 @@ function updatePixelRangeLabels() {
         const el = document.getElementById(id);
         if (el && val !== undefined) el.textContent = val;
     });
+    if (pixelDimensionsLabel && pixelNativeW) {
+        const { w, h } = getOutputDimensions();
+        pixelDimensionsLabel.textContent =
+            `${w} × ${h} — ${pct}% of ${pixelNativeW} × ${pixelNativeH}`;
+    }
 }
 
-if (pixelDownloadBtn) {
-    pixelDownloadBtn.addEventListener('click', downloadPixelPng);
-}
 const pixelDownloadNativeBtn = document.getElementById('pixelDownloadNativeBtn');
-if (pixelDownloadNativeBtn) {
-    pixelDownloadNativeBtn.addEventListener('click', downloadPixelNative);
-}
+if (pixelDownloadBtn) pixelDownloadBtn.addEventListener('click', downloadPixelPng);
+if (pixelDownloadNativeBtn) pixelDownloadNativeBtn.addEventListener('click', downloadPixelNative);
 
 document.addEventListener('app:imageLoaded', (e) => {
     setPixelSourceImage(e.detail.img);
+});
+
+window.addEventListener('resize', () => {
+    if (pixelSourceImage && pixelZoomAuto?.checked) renderPixelArt();
 });
 
 updatePixelRangeLabels();

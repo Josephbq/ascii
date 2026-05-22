@@ -1,91 +1,82 @@
 # Image to ASCII & Pixel Art
 
-Convert images into detailed **ASCII art** or high-resolution **pixel art** using a browser-based web app, or optional Python CLI tools.
+A single-page web studio that turns photos into **ASCII art** or **pixel art** — entirely in the browser. No install, no server, and no uploads: your images never leave your device.
 
-## Web app (recommended)
+**[Open the app →](index.html)** · [GitHub](https://github.com/josephbarralquinteros/varios) · [MIT License](LICENSE)
 
-Open [`index.html`](index.html) in any modern browser. No install, no server, and no uploads — processing runs entirely on your device.
+---
 
-### ASCII Art tab
+## What it does
 
-- Multiple character sets: dense, blocks, braille, standard, and more
-- Optional black & white conversion before rendering
-- Color preview, dithering, gamma, contrast, and sharpening
-- Live preview with automatic font scaling
-- Copy to clipboard or download as `.txt`
+| Mode | Description |
+|------|-------------|
+| **ASCII Art** | Maps image brightness to text characters (dense sets, blocks, braille, and more). Optional color preview, dithering, gamma, and sharpening. Export as plain text. |
+| **Pixel Art** | Processes images at **full original resolution by default**, then lets you **reduce** resolution with a slider for a retro pixel look. Palette reduction, dithering, and crisp PNG export. |
 
-### Pixel Art tab
+Both modes update live as you tweak settings. Load an image from disk or **paste** from the clipboard (`Ctrl+V` / `Cmd+V`).
 
-- High-detail grid up to **512 px** wide (height scales with aspect ratio)
-- Area-average downsampling for accurate per-pixel colors
-- **K-means** palette reduction (2–256 colors) with optional Floyd–Steinberg dithering
-- Contrast, saturation, and sharpness controls
-- Crisp preview with checkerboard background and pixelated scaling
-- Download preview PNG (zoomed) or native 1× resolution PNG
+---
 
-### Quick tips
+## Quick start
 
-| Goal | Suggestion |
-|------|------------|
-| Recognizable ASCII | Use **Dense** or **Braille**, enable color preview, width 140–200 |
-| Retro pixel look | Grid 128–256, palette 8–32 colors, dithering on |
-| Maximum pixel detail | Grid width 384–512, palette 64–128 colors |
-| Sharp edges | Increase sharpness slightly; disable smoothing |
+1. Clone or download this repository. or visit (https://asciijb.netlify.app/)
+2. Open **`index.html`** in Chrome, Firefox, Edge, or Safari.
+3. Choose **ASCII Art** or **Pixel Art**, select an image, adjust settings, download or copy the result.
 
-## Python CLI tools
+No `npm install`, no build step, no backend.
 
-Legacy command-line scripts are included for terminal workflows.
+---
 
-### Requirements
+## Files
 
-```bash
-pip install -r requirements.txt
-```
+| File | Role |
+|------|------|
+| [`index.html`](index.html) | UI, styles, tabs, footer |
+| [`script.js`](script.js) | ASCII conversion engine |
+| [`pixel.js`](pixel.js) | Pixel art engine |
+| [`LICENSE`](LICENSE) | MIT license |
 
-For the Flask pixel-art server (`pixel_art.py`):
+---
 
-```bash
-pip install -r requirements_pixel.txt
-```
+## ASCII Art
 
-### `arte.py` — detailed ASCII
+- **Styles:** Dense (70+ levels), blocks, braille (2× horizontal detail), standard, simple, minimal
+- **Color preview** — keeps original hues on each character (often the most readable option)
+- Optional black & white pass, Floyd–Steinberg dithering, contrast, gamma, sharpness
+- **Copy to clipboard** or download `.txt`
+- Width in characters (40–300); height follows aspect ratio automatically
 
-```bash
-python arte.py
-```
+**Tips:** Use *Dense* or *Braille* at width 140–200. Enable color preview for photos and portraits.
 
-Interactive file picker; keeps more detail with a wide character set.
+---
 
-### `arte_simple.py` — simplified ASCII
+## Pixel Art
 
-```bash
-python arte_simple.py
-```
+- **Default output = 100%** of the uploaded image’s width and height (true native resolution)
+- **Resolution slider (5–100%)** — only lowers size when you want a blockier look
+- Area averaging when downscaling; direct per-pixel processing at 100%
+- K-means palette (2–256 colors) with optional dithering
+- Contrast, saturation, sharpness, light smoothing
+- **Auto-fit preview** scales the canvas view without changing export size
+- Download PNG at output dimensions (not preview zoom)
 
-Lower resolution, fewer characters — more abstract output.
+**Tips:** Start at 100% for maximum detail. For retro style, try 25–50% resolution with 8–32 colors and dithering on.
 
-### `pixel_art.py` — Flask pixel server
+> Very large images (e.g. 6000×4000) may take longer to process. The app shows a notice; lower the resolution % if needed.
 
-```bash
-python pixel_art.py
-```
+---
 
-Then open `http://localhost:5000`. The browser app in `index.html` offers more controls and does not require Python.
+## Privacy
+
+All processing uses the Canvas API in your browser. Images are not sent to any server.
+
+---
 
 ## Supported formats
 
-PNG, JPG, JPEG, BMP, GIF, and other formats supported by the browser or Pillow.
+Any image format your browser can decode: PNG, JPEG, WebP, GIF, BMP, etc.
 
-## Project structure
-
-| File | Description |
-|------|-------------|
-| `index.html` | Main web UI (ASCII + Pixel tabs) |
-| `script.js` | ASCII conversion engine |
-| `pixel.js` | Pixel art conversion engine |
-| `arte.py` | CLI ASCII (detailed) |
-| `arte_simple.py` | CLI ASCII (simple) |
-| `pixel_art.py` | Flask pixel-art server |
+---
 
 ## License
 
